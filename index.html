@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STARSHIP 011179 | 歌单航行终端</title>
+    <style>
+        :root {
+            --primary: #5c6af4; /* 飞船蓝 */
+            --accent: #b95cf4;  /* 霓虹紫 */
+            --glass: rgba(16, 18, 27, 0.7); /* 更深邃的玻璃色 */
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text: #ffffff;
+            --text-dim: #cccccc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text);
+            /* 深空背景：纯黑底色 */
+            background: #000;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 1. 动态星空层 (最底层) */
+        #star-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -10;
+        }
+
+        /* 2. 新图融合层 (仪表盘纹理 - 你的黑底蓝字图) */
+        .ui-layer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 80vw;
+            height: 80vh;
+            z-index: -5;
+            opacity: 0.25;
+            background-image: url('ui.jpg');
+            background-repeat: no-repeat;
+            background-position: bottom left;
+            background-size: contain;
+            pointer-events: none;
+            /* 遮罩：隐藏右侧白色文字 */
+            -webkit-mask-image: linear-gradient(to right, black 60%, transparent 90%);
+            mask-image: linear-gradient(to right, black 60%, transparent 90%);
+            mix-blend-mode: screen;
+        }
+
+        /* 3. 飞船主舷窗 (你的动漫少女图) */
+        .viewport-container {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            height: 90vh;
+            max-width: 1400px;
+            max-height: 800px;
+            z-index: -2;
+            
+            background-image: url('bg.jpg');
+            background-size: cover;
+            background-position: center;
+            
+            border-radius: 20px;
+            border: 1px solid rgba(92, 106, 244, 0.4);
+            box-shadow: 
+                0 0 50px rgba(92, 106, 244, 0.15),
+                inset 0 0 100px rgba(0,0,0,0.9); /* 内部加深，突出景深 */
+            overflow: hidden;
+            opacity: 0.9;
+        }
+
+        /* 扫描线效果 */
+        .viewport-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 14, 30, 0.4);
+            background-image: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.2) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        /* 内容容器 */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 头部设计 */
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            background: rgba(16, 18, 27, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            animation: float 8s ease-in-out infinite; /* 浮动更慢 */
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, var(--primary), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(92, 106, 244, 0.6);
+            font-family: 'Times New Roman', serif;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            margin-top: 15px;
+            color: var(--primary);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(92, 106, 244, 0.4);
+        }
+
+        /* 搜索框 */
+        .search-box {
+            width: 100%;
+            padding: 18px 30px;
+            font-size: 1.1rem;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--primary);
+            border-radius: 50px;
+            color: white;
+            backdrop-filter: blur(10px);
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(92, 106, 244, 0.2);
+            margin-bottom: 40px;
+        }
+        .search-box:focus {
+            outline: none;
+            background: rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 30px rgba(92, 106, 244, 0.5);
+            border-color: #fff;
+        }
+
+        /* 分类标签 */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            padding: 10px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(5px);
+            font-size: 0.95rem;
+        }
+
+        .tab-btn:hover, .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 20px var(--primary);
+            transform: scale(1.05);
+        }
+
+        /* 列表网格 */
+        .song-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .song-card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 16px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        /* 卡片悬停光效 */
+        .song-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.05) 100%);
+            opacity: 0;
+            transition: 0.3s;
+        }
+
+        .song-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--primary);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+        }
+        .song-card:hover::after { opacity: 1; }
+
+        .song-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .song-artist {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tag {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            background: rgba(92, 106, 244, 0.2);
+            color: #aeb4ff;
+            border-radius: 6px;
+        }
+
+        /* 点击星星特效 */
+        .click-star {
+            position: absolute;
+            width: 40px; height: 40px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            animation: burst 0.8s ease-out forwards;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        @keyframes burst {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+        }
+
+        .stats {
+            text-align: center;
+            margin-top: 60px;
+            color: rgba(255,255,255,0.3);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="star-canvas"></canvas>
+
+<div class="ui-layer"></div>
+
+<div class="viewport-container">
+    <div class="viewport-overlay"></div>
+</div>
+
+<div class="container">
+    <header>
+        <h1>✦♪ 𝑺𝒕𝒂𝒓𝒔𝒉𝒊𝒑𝟎𝟏𝟏𝟏𝟕𝟗'𝒔 𝑹𝒆𝒑𝒆𝒓𝒕𝒐𝒊𝒓𝒆 ♪✦</h1>
+        <div class="subtitle">Starship SongList</div>
+    </header>
+
+    <div class="search-wrapper">
+        <input type="text" id="searchInput" class="search-box" placeholder="检索数据库...">
+    </div>
+
+    <div class="tabs" id="categoryTabs">
+        <button class="tab-btn active" data-cat="all">全舰广播</button>
+        <button class="tab-btn" data-cat="华语女">华语女声</button>
+        <button class="tab-btn" data-cat="华语男">华语男声</button>
+        <button class="tab-btn" data-cat="粤语">粤语金曲</button>
+        <button class="tab-btn" data-cat="英文">英文/欧美</button>
+        <button class="tab-btn" data-cat="R&B">R&B</button>
+        <button class="tab-btn" data-cat="Jazz">Jazz</button>
+        <button class="tab-btn" data-cat="古风">古风</button>
+        <button class="tab-btn" data-cat="V家">V家/二次元</button>
+        <button class="tab-btn" data-cat="Rap">说唱</button>
+        <button class="tab-btn" data-cat="儿歌">儿歌/童趣</button>
+        <button class="tab-btn" data-cat="日语">日语</button>
+    </div>
+
+    <div class="song-grid" id="songContainer">
+        </div>
+
+    <div class="stats" id="statsBar">SYSTEM ONLINE</div>
+</div>
+
+<script>
+    // ================= 1. 数据部分 (基于Word文档 ) =================
+    const musicData = {
+        "华语女": {
+            "A-lin": ["我很忙","失恋无罪","天若有情","有一种悲伤","幸福了然后呢","给我一个理由忘记"],
+            "安溥/张悬": ["喜欢","两者","宝贝","艳火","关于我爱你","最好的时光"],
+            "By2": ["我知道","凑热闹","爱丫爱丫","爱的双重魔力"],
+            "蔡琴": ["渡口","张三的歌","南屏晚钟","你的眼神","大约在冬季","恰似你的温柔","被遗忘的时光","给电影人的情书"],
+            "陈粒": ["光","虚拟","小半","祝星","走马","种种","果实","如也","性空山","妙龄童","桥豆麻袋","历历万乡","易燃易爆炸","奇妙能力歌","绝对占有绝对自由"],
+            "陈绮贞": ["鱼","烟火","太聪明","旅行的意义","私奔到月球","我喜欢上你时的内心活动"],
+            "陈婧霏": ["深蓝","春色悠悠不及你荡漾","我的孤独认出你的孤独"],
+            "蔡健雅": ["思念","达尔文","空白格","无底洞","别找我麻烦","红色高跟鞋","越来越不懂","被驯服的象","若你碰到他","十万毫升泪水","Letting Go","Beautiful love"],
+            "蔡依林": ["倒带","妥协","舞娘","特务J","日不落","说爱你","心型圈","心引力","爱情36计","无言以对","布拉格广场","马德里不思议","今天你要嫁给我","Love Love Love"],
+            "戴佩妮": ["怎样","你要的爱"],
+            "戴爱玲": ["沸腾","累格","空港"],
+            "邓丽君": ["甜蜜蜜","夜来香","小城故事","天涯歌女","我只在乎你","漫步人生路","再见，我的爱人","月亮代表我的心","路边的野花不要采"],
+            "丁当": ["洋葱","猜不透","我爱他","你为什么说谎"],
+            "范晓萱": ["氧气","哭了","健康歌","稍息立正站好","管他什么音乐","我要我们在一起","You Don't Trust Me at All"],
+            "范玮琪": ["到不了","是非题","黑白配","那些花儿","如果的事","悄悄告诉你","最初的梦想","最重要的决定","可不可以不勇敢","一个像夏天一个像秋天"],
+            "郭静": ["心墙","爱情讯息","下一个天亮","在树上唱歌"],
+            "郭采洁": ["爱情定格","你在，不在","我的未来式","爆炸的沉默","世界上的另一个我"],
+            "金海心": ["那么骄傲","爱似水仙","把耳朵叫醒","阳光下的星星"],
+            "LÜCY": ["CACTUS","电线杆上的鸟"],
+            "梁静茹": ["问","暖暖","宁夏","勇气","情歌","崇拜","丝路","慢冷","我喜欢","燕尾蝶","没有如果","分手快乐","会过去的","夜夜夜夜","会呼吸的痛","可惜不是你","爱久见人心","我们就到这","小手拉大手","别再为他流泪","情歌没有告诉你","爱情之所以为爱情","Way Back into Love"],
+            "林忆莲": ["无赖","归零","伤痕","词不达意","再见悲哀","梦醒时分","至少还有你","分分钟需要你","当爱已成往事","不必在乎我是谁","为你我受冷风吹"],
+            "莫文蔚": ["爱","阴天","初恋","境外","忽然之间","电台情歌","一生所爱","他不爱我","广岛之恋","完美孤独","外面的世界","盛夏的果实","如果没有你","慢慢喜欢你","这世界那么多人","在那遥远的地方"],
+            "刘若英": ["后来","成全","分开旅行","当爱在靠近","很爱很爱你","原来你也在这里"],
+            "苏运莹": ["我","野子","生活倒影"],
+            "孙燕姿": ["遇见","绿光","漩涡","逆光","雨天","我的爱","第一天","克卜勒","天黑黑","隐形人","咕叽咕叽","我不难过","我怀念的","半句再见","开始懂了","我也很想他","愚人的国度","当冬夜渐暖","Hey Jude"],
+            "S.H.E": ["中国话","安静了","恋人未满","一眼万年","Super Star","沿海公路的出口"],
+            "田馥甄": ["无常","小幸运","终身大事","不醉不会","只对你有感觉","寂寞寂寞就好","魔鬼中的天使","你就不要想起我","我想我不会爱你"],
+            "谭维维": ["谭某某","敕勒歌","如果有来生","乌兰巴托的夜"],
+            "王若琳": ["偿还","亲密爱人","有你的快乐","今宵多珍重","I Love You","Vincent","Lost in Paradise","Just the Two of us","Can't Take My Eyes off you"],
+            "万玲琳": ["蜜蜂","黑洞里"],
+            "王心凌": ["爱你","大眠","月光","当你","明天见","黄昏晓","花的嫁纱","睫毛弯弯","梦的光点","我会好好的","爱的天灵灵","木马屠城记","第一次爱的人","那年夏天宁静的海","Honey","Da Da Da"],
+            "徐佳莹": ["惧高症","喜欢你","到此为止","行走的鱼","身骑白马","失落沙洲","你敢不敢","不要再孤单","一样的月光"],
+            "小霞/黄绮珊": ["拆穿","我的美丽","离不开你"],
+            "杨乃文": ["静止","证据","未接来电","我离开我自己","推开世界的门"],
+            "杨丞琳": ["暧昧","左边","快转","庆祝","雨爱","仰望","年轮说","带我走","我们都傻","匿名的好友","在你怀里的微笑"],
+            "郁可唯": ["指望","时间煮雨","路过人间","去有风的地方"],
+            "萧亚轩": ["错的人","突然想起你","遗失的心跳"],
+            "张惠妹": ["傲娇","掉了","记得","人质","不该","听海","过不去","我要快乐","连名带姓","也许明天","我最亲爱的","爱什么稀罕","如果你也听说","我可以抱你吗","血腥爱情故事","别在伤口撒盐","相爱后动物感伤","原来你什么都不要"],
+            "张韶涵": ["阿刁","寓言","梦里花","欧若拉","不想懂得","香水百合","我恋爱了","遗失的美好","隐形的翅膀","淋雨一直走","喜欢你没道理","看得最远的地方","亲爱的，那不是爱情"],
+            "张靓颖": ["画心","离歌","终于等到你","如果这就是爱情"],
+            "张碧晨": ["笼","凉凉","年轮","红玫瑰","袖手旁观","你给我听好"],
+            "其他女声": ["默","狼","你","遇到","囚鸟","雨蝶","煎熬","微微","深蓝","原谅","挣脱","夜车","如此","房间","玩笑","秋风","偏爱","绿色","也罢","蠢货","流浪记","爱啦啦","爱得起","女儿情","我要你","胡广生","三角题","樱花草","半情歌","好想你","狮子座","不要怕","调查中","恶作剧","无限速","童话镇","新造的人","夏天的风","如果可以","我很快乐","说散就散","同手同脚","孤单心事","阿楚姑娘","恋爱告急","第三人称","滥俗的歌","新不了情","相见恨晚","爱的城堡","情人知己","最后一页","爱X无限大","123木头人","99次我爱他","爱要坦荡荡","一直很安静","不完美小孩","怎么唱情歌","带我到山顶","九头身日奈","明天会更好","最浪漫的事","没那么简单","心愿便利贴","七月七日晴","如果云知道","踮起脚尖爱","走在冷风中","想你的365天","永不失联的爱","这条小鱼在乎","春日部的告别","有可能的夜晚","阿拉斯加海湾","天亮以前说再见","梁山伯与朱丽叶","酸酸甜甜就是我","莫名奇妙爱上你","在意识里过一生","马来西亚的查某","全世界的人都知道","一个人想着一个人","都市丽人生存报告","全世界我最喜欢你","请和这样的我恋爱吧","我在人民广场吃炸鸡","春色悠悠不及你荡漾","遇见你的时候所有星星都落到我头上","Dear John"]
+        },
+        "华语男": {
+            "郭顶": ["保留","水星记","凄美地","我们俩"],
+            "梁博": ["男孩","日落大道","出现又离开"],
+            "李宗盛": ["山丘","晚婚","给自己的歌","漂洋过海来看你"],
+            "林俊杰": ["她说","当你","江南","曹操","学不会","小酒窝","飞云之下","不死之身","修炼爱情","背对背拥抱","爱笑的眼睛","第几个一百天","不潮不用花钱","被风吹过的夏天","不为谁而作的歌"],
+            "林宥嘉": ["思凡","兜圈","浪费","说谎","想自由","残酷月光","天真有邪","再别康桥","心有林夕","我爱的人","早开的晚霞","你是我的眼","致姗姗来迟的你","如同悲伤被下载了两次","我总是一个人在练习一个人"],
+            "宋冬野": ["董小姐","莉莉安","安和桥","斑马，斑马"],
+            "伍佰": ["被动","泪桥","夏夜晚风","Last Dance","突然的自我","挪威的森林","再度重相逢"],
+            "张信哲": ["过火","信仰","用情","无别","爱如潮水"],
+            "张震岳": ["小宇","再见","爱我别走","爱的初体验","思念是一种病"],
+            "周杰伦": ["枫","搁浅","彩虹","退后","手语","花海","安静","轨迹","星晴","晴天","借口","稻香","斗牛","屋顶","暗号","画沙","蜗牛","东风破","发如雪","时光机","甜甜的","我不配","大笨钟","龙卷风","菊花台","青花瓷","公主病","迷迭香","简单爱","珊瑚海","七里香","园游会","明明就","她的睫毛","白色风车","黑色毛衣","浪漫手机","半岛铁盒","烟花易冷","断了的弦","回到过去","世界末日","开不了口","一路向北","告白气球","可爱女人","你听得到","牛仔很忙","千里之外","黑色幽默","说了再见","威廉古堡","完美主义","阳光宅男","反方向的钟","爱在西元前","手写的从前","最长的电影","听妈妈的话","听爸爸的话","米兰的小铁匠","说好的幸福呢","不能说的秘密","蒲公英的约定","你比从前快乐","你是我的ok绷","听见下雨的声音","给我一首歌的时间"],
+            "其他男声": ["谁","背叛","嘉宾","王妃","春泥","成都","白羊","青柠","模特","消愁","他不懂","跳楼机","一个人","吵架歌","海芋恋","喜剧之王","独家记忆","寂寞先生","漠河舞厅","理想三旬","情非得已","寂寞沙洲冷","我是一只鱼","其实都没有","有梦好甜蜜","一场游戏一场梦","好想爱这个世界啊","她来听我的演唱会","昨晚，潜入离奇星球","New Boy","Insulation"]
+        },
+        "粤语": {
+            "陈奕迅": ["完","沙龙","内疚","单车","倾城","兄妹","淘汰","绵绵","浮夸","十年","孤勇者","红玫瑰","白玫瑰","圣诞结","陀飞轮","谢谢侬","无条件","七百年后","明年今日","十面埋伏","最佳损友","岁月如歌","爱情转移","富士山下","不要说话","心的距离","爱是怀疑","失忆蝴蝶","阴天快乐","K歌之王","人来人往","好久不见","孤独患者","你的背包","无人之境","一切还好","于心有愧","失恋太少","放弃治疗","一丝不挂","打回原形","是但求其爱","葡萄成熟时","你给我听好","对不起谢谢","全世界失眠","Last Order","Shall We Talk","Lonely Christmas"],
+            "陈洁仪": ["等","遺憾","心动","风景","喜欢你"],
+            "陈慧娴": ["飘雪","夜机","归来吧","千千阙歌","偏偏喜欢你","月半小夜曲","让一切随风","人生何处不相逢"],
+            "邓紫棋": ["泡沫","情人","喜欢你","后会无期","你把我灌醉","红蔷薇白玫瑰"],
+            "容祖儿": ["小小","心淡","连续剧","习惯失恋","挥着翅膀的女孩"],
+            "杨千嬅": ["勇","处处吻","野孩子","小城大事","再见二丁目","可惜我是水瓶座"],
+            "Twins": ["二缺一（蔡卓妍）","见习爱神","下一站天后","我很想爱他","莫斯科没有眼泪"],
+            "卫兰": ["大哥","残酷游戏","街灯晚餐"],
+            "吴雨霏": ["我本人","吴哥窟","生生世世爱"],
+            "王菲": ["闷","暗涌","人间","如愿","如风","红豆","旋木","邮差","流年","暧昧","矜持","约定","多得他","笑忘书","致青春","光之翼","梦中人","执迷不悔","百年孤寂","开到荼靡","匆匆那年","归途有风","给自己的情书","爱与痛的边缘","你在终点等我","我和我的祖国","容易受伤的女人","你快乐所以我快乐"],
+            "谢安琪": ["再见","可乐","喜帖街","钟无艳"],
+            "其他粤语": ["孤雏","蜚蜚","七夕","七友","梦伴","最爱","红日","初恋","上海滩","爱与诚","电灯胆","苏州河","慕容雪","女人花","一生所爱","好心分手","你瞒我瞒","自作多情","海阔天空","饿狼传说","遥远的她","Wonderful U","一生中最爱","讲不出再见","吻得太逼真","分分钟需要你","油尖旺金毛玲","假如真的再有约会"]
+        },
+        "英文": {
+            "Adele": ["Hello","All I ask","Easy On ME","Rolling in the Deep","Someone Like You","Set Fire to the Rain"],
+            "Beyonce": ["Halo","Listen","Telephone","If I Were a Boy"],
+            "Bruno Mars": ["The Lazy Song","Talking to the Moon","Just The Way You Are","When I Was Your Man"],
+            "Justin Bieber": ["Baby","Boyfriend","Beautiful","Love Yourself","That should be Me","As Long As You Love Me"],
+            "Lana Del Rey": ["Brooklyn Baby","Breaking My Heart","Summertime Sadness","West Coast","Young and Beautiful"],
+            "Taylor Swift": ["22","Love story","Sparks Fly","Enchanted","Safe & Sound","You Belong With Me","I Knew You Were Trouble","We Are Never Ever Getting Back Together"],
+            "Pink": ["Try","Fuckin Perfect","Just Give Me a Reason","Whatya Want From Me"],
+            "ETC.": ["All of Me","Almost Lover","All Rise","Barbie Girl","Burning","Bad Guy","Better man","Big Big World","Because of You","Complicated","Close To You","Counting Stars","Call Me Maybe","Calendar Girl","Come Back to Me","California Dreamin'","Can't Take My Eyes Off You","Dancing with Your Ghost","Gasoline","Good Time","Gotta Have You","Free Loop","FourFiveSeconds","Fly Me to the Moon","Far Away From Home","Hey Jude","Innocence","If I Die Young","I Wanted You","I Really Like You","I Am Me Once More","I'm Not The Only One","I Hate Myself for Loving You","I Wanna Be Your Slave","Just a Kiss","Johnny It's The Last Time","Killing Me Softly With His Song","Lucky","Liability","Lost Stars","Landing Guy","Lemon Tree","Loving Strangers","Love Me Like You Do","Mad World","My Medicine","My Love","Million Reasons","My Heart Will Go On","Need You Now","Never Enough","Nothing's Gonna Change My Love for You","One love","One Call Away","Redbone","Roll The Dice","Pretty Boy","Perfect","Price Tag","Say Something","Say Hello","She","Snowman","Stronger","Stay With Me","Shape of You","Staring at You","Scarborough Fair","Save Me From Myself","Saving All My Love For You","Starry Starry Night/Vincent","Toxic","Tik Tok","The Rose","The Show","Take a Bow","Thinking out Loud","Trouble is a Friend","The Saltwater Room","Yellow","You Raise Me Up","Yesterday Once More","Who Says","Wonderful U","Wrecking Ball","When You Believe","Way Back Into Love"]
+        },
+        "R&B": {
+            "方大同": ["黑白","南音","三人游","自以为","四人游","爱爱爱","黑洞里","好不容易","特别的人","复刻回忆","Love Song","为你写的歌","Singalongsong","Nothing's Gonna Change My Love for You"],
+            "陶喆": ["流沙","天天","找自己","普通朋友","爱很简单","小镇姑娘","Melody"],
+            "王力宏": ["改变自己","我们的歌","火力全开","大城小爱","落叶归根","你不知道的事"],
+            "其他R&B": ["不枉","瘦子","灯光","你的","Simon","Coco9","不值得","我爱你","别问很可怕","刻在我心底的名字"]
+        },
+        "Jazz": {
+            "Jazz精选": ["偿还","亲密爱人","基本上无害","有你的快乐","走钢索的人","今宵多珍重","Vincent/Starry Starry Night","I Love You","Lemon Tree","City of Stars","La Vie en Rose","Que Sera Sera","Lost in paradise","If I Ain't Got You","Hit The Road Jack","Just the Two of us","Fly Me to the Moon","I Am Me Once More","Whiskey and Morphine","You Don't Trust Me At All","Johnny It's The Last Time","Can't Take My Eyes off you","Dream a Little Dream of Me","Killing Me Softly With His Song"]
+        },
+        "古风": {
+            "古风精选": ["大喜","画心","大鱼","夜奔","出山","年轮","牵丝戏","眉南边","沈园外","盗将行","红颜旧","锦鲤抄","绝世舞姬","三拜红尘凉","我的一个道姑朋友"]
+        },
+        "V家": {
+            "V家/二次元": ["勾指起誓","白鸟过河滩","幹物女（WeiWei）","神的随波逐流","我没有歌能给你听"]
+        },
+        "日语": {
+            "日语精选": ["銀色飛行船","打上花火","届かない恋","ドライフラワー（干花）","奏 (かなで)","暁の車","Stay Gold","Chiikawa之歌","真夜中のドア〜stay with me"]
+        },
+        "Rap": {
+            "Rap精选": ["斗牛","暴风雨","真没睡","狐狸精","全是爱","奢香夫人","个人简介","危险派对","百变酒精","我的主题曲","布拉格广场","请和这样的我恋爱吧","My Boo","Lover Boy 88","R&B All Night","I Never Told You"]
+        },
+        "儿歌": {
+            "童趣": ["猪之歌","猪猪侠","小红象","勇气大爆发","彩虹糖的梦","我是你的小狗","Chiikawa之歌","大家一起喜羊羊","别看我只是一只羊"]
+        }
+    };
+
+    // ================= 2. 交互逻辑 (保持不变) =================
+    const songContainer = document.getElementById('songContainer');
+    const searchInput = document.getElementById('searchInput');
+    const tabs = document.querySelectorAll('.tab-btn');
+    const statsBar = document.getElementById('statsBar');
+
+    let allSongs = [];
+    Object.keys(musicData).forEach(category => {
+        Object.keys(musicData[category]).forEach(artist => {
+            musicData[category][artist].forEach(song => {
+                allSongs.push({title: song, artist: artist, category: category});
+            });
+        });
+    });
+
+    statsBar.innerText = `DATABASE LOADED: ${allSongs.length} RECORDS FOUND`;
+
+    function renderSongs(songs) {
+        songContainer.innerHTML = '';
+        if (songs.length === 0) {
+            songContainer.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #888; padding: 40px; border-radius: 12px;">NO DATA FOUND</div>`;
+            return;
+        }
+        
+        const displaySongs = songs.slice(0, 300);
+        displaySongs.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'song-card';
+            card.innerHTML = `
+                <div class="song-title">${s.title}</div>
+                <div class="song-artist">
+                    <span>${s.artist}</span>
+                    <span class="tag">${s.category}</span>
+                </div>
+            `;
+            card.addEventListener('click', (e) => {
+                const rect = card.getBoundingClientRect();
+                createStar(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            });
+            songContainer.appendChild(card);
+        });
+    }
+
+    renderSongs(allSongs);
+
+    searchInput.addEventListener('input', (e) => {
+        const keyword = e.target.value.toLowerCase().trim();
+        renderSongs(allSongs.filter(s => s.title.toLowerCase().includes(keyword) || s.artist.toLowerCase().includes(keyword)));
+    });
+
+    tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            const cat = btn.dataset.cat;
+            if (cat === 'all') renderSongs(allSongs);
+            else renderSongs(allSongs.filter(s => s.category === cat));
+            searchInput.value = '';
+        });
+    });
+
+    function createStar(x, y) {
+        const star = document.createElement('div');
+        star.className = 'click-star';
+        star.style.left = (x - 20) + 'px';
+        star.style.top = (y - 20) + 'px';
+        const rotation = Math.random() * 360;
+        star.style.transform = `rotate(${rotation}deg)`;
+        document.body.appendChild(star);
+        setTimeout(() => star.remove(), 600);
+    }
+
+    // ================= 3. 动态星空 (Deep Space Mode) =================
+    const canvas = document.getElementById('star-canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let stars = [];
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Star {
+        constructor() {
+            this.reset(true);
+        }
+
+        reset(initial = false) {
+            this.x = (Math.random() - 0.5) * width;
+            this.y = (Math.random() - 0.5) * height;
+            // 深度 Z，范围 0 (近) 到 1000 (远)
+            this.z = initial ? Math.random() * 1000 : 1000; 
+            // 随机速度：0.2 到 1.5，极慢速漂浮
+            this.speed = Math.random() * 1.3 + 0.2; 
+            // 随机闪烁相位
+            this.blinkOffset = Math.random() * 100;
+        }
+
+        update() {
+            this.z -= this.speed; 
+            if (this.z < 1) {
+                this.reset();
+            }
+        }
+
+        draw(frame) {
+            // 透视投影
+            const sx = (this.x / this.z) * 500 + width / 2;
+            const sy = (this.y / this.z) * 500 + height / 2;
+
+            // 如果在屏幕外则不画
+            if (sx < 0 || sx > width || sy < 0 || sy > height) return;
+
+            // 星星大小随距离变化，最大 2.5px
+            const size = (1 - this.z / 1000) * 2.5;
+            
+            // 基础透明度随距离变化
+            let opacity = (1 - this.z / 1000);
+            
+            // 呼吸闪烁效果：使用正弦波
+            // 只有远处的星星闪烁明显，近处常亮
+            if (this.z > 500) {
+                const blink = (Math.sin(frame * 0.05 + this.blinkOffset) + 1) / 2; // 0~1
+                opacity = opacity * (0.5 + blink * 0.5); // 0.5倍亮度保底
+            }
+
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < 800; i++) { // 增加星星数量至800
+            stars.push(new Star());
+        }
+    }
+    initStars();
+
+    let frame = 0;
+    function animate() {
+        // 清除画布，不再使用半透明遮罩(取消拖尾)
+        ctx.clearRect(0, 0, width, height);
+        
+        frame++;
+        stars.forEach(star => {
+            star.update();
+            star.draw(frame);
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+</script>
+</body>
+</html>
