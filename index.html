@@ -49,13 +49,12 @@
             background-position: bottom left;
             background-size: contain;
             pointer-events: none;
-            /* 遮罩：隐藏右侧白色文字 */
             -webkit-mask-image: linear-gradient(to right, black 60%, transparent 90%);
             mask-image: linear-gradient(to right, black 60%, transparent 90%);
             mix-blend-mode: screen;
         }
 
-        /* 3. 飞船主舷窗 (你的动漫少女图) */
+        /* 3. 飞船主舷窗 (PC端默认样式) */
         .viewport-container {
             position: fixed;
             top: 50%; left: 50%;
@@ -74,7 +73,7 @@
             border: 1px solid rgba(92, 106, 244, 0.4);
             box-shadow: 
                 0 0 50px rgba(92, 106, 244, 0.15),
-                inset 0 0 100px rgba(0,0,0,0.9); /* 内部加深，突出景深 */
+                inset 0 0 100px rgba(0,0,0,0.9);
             overflow: hidden;
             opacity: 0.9;
         }
@@ -108,7 +107,7 @@
             border-radius: 16px;
             border: 1px solid var(--glass-border);
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            animation: float 8s ease-in-out infinite; /* 浮动更慢 */
+            animation: float 8s ease-in-out infinite;
         }
 
         @keyframes float {
@@ -207,7 +206,6 @@
             cursor: pointer;
         }
 
-        /* 卡片悬停光效 */
         .song-card::after {
             content: '';
             position: absolute;
@@ -250,7 +248,6 @@
             border-radius: 6px;
         }
 
-        /* 点击星星特效 */
         .click-star {
             position: absolute;
             width: 40px; height: 40px;
@@ -273,80 +270,76 @@
             letter-spacing: 2px;
         }
 
-        /* ========== 移动端适配 (Media Query) ========== */
+        /* ==================================================== */
+        /* ========== 移动端 (手机) 专属设计 (v3.3) ========== */
+        /* ==================================================== */
         @media (max-width: 768px) {
-            /* 1. 让飞船视窗铺满全屏，取消悬浮感 */
+            /* 1. 全息投影模式：把图片锚定在左下角，不铺满 */
             .viewport-container {
-                width: 100vw;
-                height: 100vh;
-                top: 0; left: 0;
-                transform: none;
+                width: 90%; /* 宽度占90%，留出一点边缘 */
+                height: 65vh; /* 高度只占屏幕的 65%，留出顶部给星空 */
+                top: auto; 
+                bottom: -20px; /* 稍微下沉一点，确保底部对齐 */
+                left: 0;
+                transform: none; /* 取消居中偏移 */
+                
+                /* 设计关键：只显示图片的左下部分 */
+                background-position: left bottom; 
+                background-size: cover; 
+                background-repeat: no-repeat;
+                
+                /* 视觉融合：使用渐变遮罩，让图片的右边和上边淡出 */
+                -webkit-mask-image: linear-gradient(to top right, black 40%, transparent 90%);
+                mask-image: linear-gradient(to top right, black 40%, transparent 90%);
+                
+                /* 移除边框和阴影，让它看起来像全息投影 */
                 border: none;
-                border-radius: 0;
-                opacity: 0.6; /* 稍微调暗一点，让文字更清晰 */
                 box-shadow: none;
+                border-radius: 0;
+                opacity: 0.8; /* 稍微透明，增加全息感 */
             }
 
-            /* 2. 背景图重心调整 */
-            .viewport-container {
-                background-position: center top; 
-            }
+            /* 2. 隐藏仪表盘纹理层 */
+            .ui-layer { display: none; }
 
-            /* 3. 隐藏仪表盘纹理层 */
-            .ui-layer {
-                display: none;
-            }
-
-            /* 4. 调整标题大小 */
+            /* 3. 调整标题 */
             header {
-                padding: 25px 15px;
-                margin-bottom: 30px;
-                animation: none; /* 手机上取消浮动动画 */
+                padding: 20px 10px;
+                margin-bottom: 20px;
+                animation: none;
+                background: rgba(16, 18, 27, 0.4); /* 手机上头部更透明一点，透出星空 */
             }
             
             h1 {
-                font-size: 1.8rem; /* 缩小标题 */
+                font-size: 1.6rem;
                 letter-spacing: 1px;
-                line-height: 1.3;
+                line-height: 1.2;
             }
 
-            .subtitle {
-                font-size: 0.8rem;
-                letter-spacing: 3px;
-            }
+            .subtitle { font-size: 0.7rem; }
 
-            /* 5. 调整布局间距 */
-            .container {
-                padding: 20px 15px;
-            }
+            /* 4. 调整容器内边距 */
+            .container { padding: 15px 15px; }
+            .search-box { padding: 12px 20px; font-size: 1rem; }
 
-            .search-box {
-                padding: 12px 20px;
-                font-size: 1rem;
-            }
-
-            /* 6. 歌单网格改为单列或双列优化 */
+            /* 5. 歌单双列布局 */
             .song-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                grid-template-columns: repeat(2, 1fr); /* 强制双列 */
                 gap: 10px;
             }
             
-            .song-card {
-                padding: 12px;
-            }
+            .song-card { padding: 12px; }
+            .song-title { font-size: 0.95rem; }
             
-            .song-title {
-                font-size: 1rem;
-            }
+            /* 手机端星星密度降低一点，防止太乱 */
+            #star-canvas { opacity: 0.8; }
         }
     </style>
 </head>
 <body>
 
 <canvas id="star-canvas"></canvas>
-
 <div class="ui-layer"></div>
-
 <div class="viewport-container">
     <div class="viewport-overlay"></div>
 </div>
@@ -376,14 +369,12 @@
         <button class="tab-btn" data-cat="日语">日语</button>
     </div>
 
-    <div class="song-grid" id="songContainer">
-        </div>
-
+    <div class="song-grid" id="songContainer"></div>
     <div class="stats" id="statsBar">SYSTEM ONLINE</div>
 </div>
 
 <script>
-    // ================= 1. 数据部分 (基于Word文档) =================
+    // ================= 数据区域 =================
     const musicData = {
         "华语女": {
             "A-lin": ["我很忙","失恋无罪","天若有情","有一种悲伤","幸福了然后呢","给我一个理由忘记"],
@@ -492,7 +483,7 @@
         }
     };
 
-    // ================= 2. 交互逻辑 (保持不变) =================
+    // ================= 交互逻辑 =================
     const songContainer = document.getElementById('songContainer');
     const searchInput = document.getElementById('searchInput');
     const tabs = document.querySelectorAll('.tab-btn');
@@ -564,7 +555,7 @@
         setTimeout(() => star.remove(), 600);
     }
 
-    // ================= 3. 动态星空 (Deep Space Mode) =================
+    // ================= 动态星空 (Deep Space Mode) =================
     const canvas = document.getElementById('star-canvas');
     const ctx = canvas.getContext('2d');
     let width, height;
@@ -615,10 +606,9 @@
             let opacity = (1 - this.z / 1000);
             
             // 呼吸闪烁效果：使用正弦波
-            // 只有远处的星星闪烁明显，近处常亮
             if (this.z > 500) {
-                const blink = (Math.sin(frame * 0.05 + this.blinkOffset) + 1) / 2; // 0~1
-                opacity = opacity * (0.5 + blink * 0.5); // 0.5倍亮度保底
+                const blink = (Math.sin(frame * 0.05 + this.blinkOffset) + 1) / 2; 
+                opacity = opacity * (0.5 + blink * 0.5); 
             }
 
             ctx.beginPath();
@@ -630,7 +620,7 @@
 
     function initStars() {
         stars = [];
-        for (let i = 0; i < 800; i++) { // 增加星星数量至800
+        for (let i = 0; i < 800; i++) { 
             stars.push(new Star());
         }
     }
@@ -638,7 +628,6 @@
 
     let frame = 0;
     function animate() {
-        // 清除画布，不再使用半透明遮罩(取消拖尾)
         ctx.clearRect(0, 0, width, height);
         
         frame++;
